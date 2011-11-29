@@ -1,0 +1,33 @@
+
+    ezgliding.com release 0.x
+
+These are the release notes for the ezgliding.com software. You can find
+information on using and contributing to the application stack.
+
+WHAT IS EZGLIDING.COM?
+
+  ezgliding.com is a website offering a set of web applications to help
+  with analysing, visualising and planning glider flights.
+
+  Initial features include aggregation of glider flights and simple
+  visualization, more coming later.
+
+  It is distributed under the GNU General Public License - see the
+  accompanying COPYING file for more details.
+
+REQUIREMENTS:
+
+  All you need to use the ezgliding.com web applications is a modern
+  web browser. 
+  
+  In the future it is possible that additional requirements are
+  introduced, for example to access attached physical resources.
+
+DOCUMENTATION:
+
+  All applications should be fairly self explanatory, if not they're
+  accompanied by the appropriate online help.
+
+DEVELOPING:
+
+  TODO
