@@ -30,4 +30,15 @@ DOCUMENTATION:
 
 DEVELOPING:
 
-  TODO
+  ezgliding.com relies mostly on appengine for its backend.
+
+  1) If not available, download the appengine sdk
+     http://code.google.com/appengine/downloads.html
+
+  2) Launch the appengine dev server
+  # <appengine sdk>/dev_appserver.py python
+
+  3) Check for a working admin console at:
+     http://localhost:8080/_ah/admin
+
+

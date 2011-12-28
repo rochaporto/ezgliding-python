@@ -31,9 +31,9 @@ class NetcoupeHandler(CommonHandler):
 
     def get(self):
         logging.info("NetcoupeHandler: started")
-        url = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=7347"
-        task = Task(url="/crawler/netcoupe/worker", params={"url": url})
-        task.add("flightprocess")
+#        url = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=7347"
+#        task = Task(url="/crawler/netcoupe/worker", params={"url": url})
+#        task.add("flightprocess")
 
 class NetcoupeWorker(CommonHandler):
 
@@ -60,6 +60,7 @@ def main():
             ('/crawler/netcoupe/worker', NetcoupeWorker),
             ], debug=True)
     logging.getLogger().setLevel(logging.DEBUG)
+    logging.debug("AAA")
     run_wsgi_app(app)
 
 if __name__ == '__main__':
