@@ -1,14 +1,13 @@
 import logging
-import urllib
 import urllib2
 import sys
 
-from google.appengine.api import taskqueue
+from google.appengine.api import taskqueue, urlfetch
 from google.appengine.ext.webapp import RequestHandler, WSGIApplication
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 import appdata
-from igc import FlightReader, FlightExporter
+from igc import FlightParser, FlightExporter
 
 class CommonHandler(RequestHandler):
 
@@ -38,7 +37,7 @@ class NetcoupeHandler(CommonHandler):
         """
         Returns the last flight ID already fetched and processed.
         """
-        return 36225
+        return 36233
 
     def getTask(self, flightId, url):
         """
@@ -59,9 +58,8 @@ class NetcoupeHandler(CommonHandler):
         curId = startId
         while True:
             flightUrl = NetcoupeWorker._baseIgcUrl % curId
-            result = urllib.urlopen(flightUrl)
-            flightData = result.read()
-            result.close()
+            result = urlfetch.fetch(flightUrl)
+            flightData = result.content
             if len(flightData) == 0 or (lastId != -1 and curId > lastId):
                 logging.info("stopping flight queueing at ID %d" % curId)
                 break
@@ -100,14 +98,13 @@ class NetcoupeWorker(CommonHandler):
         Returns a Flight object containing all the processed IGC data.
         """
         flightUrl = self._baseIgcUrl % flightId
-        result = urllib.urlopen(flightUrl)
-        if result.getcode() != 200:
+        result = urlfetch.fetch(flightUrl)
+        if result.status_code != 200:
             logging.error("Unexpected code %d processing flight %s" 
-                    % (result.getcode(), flightUrl))
-        flightData = result.read()
-        result.close()
+                    % (result.status_code, flightUrl))
+        flightData = result.content
         try:
-            reader = FlightReader(flightData)
+            reader = FlightParser(flightData)
         except:
             logging.error("failed processing flight :: %s" % (flightUrl))
             raise

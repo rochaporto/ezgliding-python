@@ -6,9 +6,12 @@ from datetime import datetime, timedelta
 from math import sin, cos, asin, acos, atan2, fabs, sqrt, radians, degrees, pi
 from optparse import OptionParser
 
-from common import Base
+class FlightBase(object):
+    """
+    Base class providing utility functions.
 
-class FlightBase(Base):
+    A 'util' class instead of inheritance might be simpler.
+    """
     
     # FAI Earth Sphere Radius
     earthRadius = 6371 
@@ -17,6 +20,9 @@ class FlightBase(Base):
         None
 
     def dms2dd(self, value):
+        """
+        Converts coordinates from DMS to decimal format.
+        """
         cardinal = value[-1]
         dd = None
         if cardinal in ('N', 'S'):
@@ -28,6 +34,12 @@ class FlightBase(Base):
         return dd
 
     def distance(self, p1, p2):
+        """
+        Returns the distance between the two given points.
+
+        The distance is calculated as the great circle distance connecting the
+        two points. The FAI earth radius is used as a basis.
+        """
         return 2 * asin( 
                 sqrt( (sin( (p1["latrd"] - p2["latrd"]) / 2 ) ) ** 2 
                     + cos(p1["latrd"]) * cos(p2["latrd"]) * ( sin( (p1["lonrd"] - p2["lonrd"]) / 2 ) ) ** 2
@@ -35,6 +47,9 @@ class FlightBase(Base):
                 ) * self.earthRadius
 
     def bearing(self, p1, p2):
+        """
+        Returns the bearing (in degrees) from point 1 to point 2.
+        """
         return degrees(
                 atan2( 
                     sin(p1["lonrd"] - p2["lonrd"]) * cos(p2["latrd"]), 
@@ -45,16 +60,48 @@ class FlightBase(Base):
 
 class Flight(FlightBase):
     """
-    Flight metadata: 
-      dte (date), fxa (fix accuracy), plt (pilot), cm2 (crew 2), gty (glider type),
-      gid (glider reg number), dtm (gps datum), rfw (logger firmware revision),
-      rhw (logger revision number), fty (logger mfr and model), gps (gps mfr / model),
-      prs (pressure sensor description), cid (competition id), ccl (glider class)
+    Class represent a flight as a set of consecutive points (lat/lon/alt).
+
+    You can fill the flight using putPoint().
+
+    self.metadata: flight metadata taken from the igc log or external sources
+      dte (date), fxa (fix accuracy), plt (pilot), cm2 (crew 2), 
+      gty (glider type), gid (glider reg number), dtm (gps datum), 
+      rfw (logger firmware revision), rhw (logger revision number), 
+      fty (logger mfr and model), gps (gps mfr / model),
+      prs (pressure sensor description), cid (competition id), 
+      ccl (glider class)
+
+    self.control: control evaluation of circling, straight, start, etc
+      minSpeed: used for flight start / end
+      minCircleRate: 
+      minCircleTime: min seconds for a spiral to have started
+      minStraightTime: min seconds for a spiral to have ended
+
+    self.points: points of the flight track (and point metadata)
+      time: time of point measurement (down to second)
+      lat: latitude (DMS)
+      lon: longitude (DMS)
+      fix:
+      pAlt: pressure altitude
+      gAlt: gps altitude
+      (check methods computeL* for further point metadata)
+      
+    self.phases: the difference flight phases (circling, straight)
+
+    self.stats: total flight stats
+      totalKms: total kms (this will be a lot more than the optimized values)
+      maxAlt: max altitude
+      maxGSpeed: max ground speed
+      minGSpeed: min ground speed
     """
 
     STOPPED, STRAIGHT, CIRCLING = range(3)
 
     def __init__(self):
+        """
+        Initiates the internal structures.
+        """
         self.metadata = {
             "mfr": None, "mfrId": None, "mfrIdExt": None,
             "dte": None, "fxa": None, "plt": None, "cm2": None, "gty": None,
@@ -71,6 +118,12 @@ class Flight(FlightBase):
         }
 
     def putPoint(self, time, lat, lon, fix, pAlt, gAlt):
+        """
+        Adds a new point to the flight track.
+
+        In addition, it calculates all the derived metadata (calling the
+        compute* methods).
+        """
         p = {
             "time": time, "lat": lat, "lon": lon, "fix": fix, "pAlt": pAlt, "gAlt": gAlt,
             "latdg": None, "londg": None, "latrd": None, "lonrd": None,
@@ -94,12 +147,21 @@ class Flight(FlightBase):
         self.updateMode()
 
     def computeL1(self, p):
+        """
+        Computes all point metadata that does not require the previous point.
+            (latdg, londg, latrd, lonrd) meaning degrees and radians
+s
+        """
         p["latdg"] = self.dms2dd(p["lat"])
         p["londg"] = self.dms2dd(p["lon"])
         p["latrd"] = radians(p["latdg"])
         p["lonrd"] = radians(p["londg"])
 
     def computeL2(self, prevP, p):
+        """
+        Computes point metadata only requiring the previous point.
+          (distance, bearing, timeDelta, pAltDelta, gAltDelta)
+        """
         p["computeL2"]["distance"] = self.distance(prevP, p)
         p["computeL2"]["bearing"] = self.bearing(prevP, p)
         p["computeL2"]["timeDelta"] = (p["time"] - prevP["time"]).seconds
@@ -107,6 +169,10 @@ class Flight(FlightBase):
         p["computeL2"]["gAltDelta"] = p["gAlt"] - prevP["gAlt"]
 
     def computeL3(self, prevP, p):
+        """
+        Computes point metadata requiring previously computed values.
+            (gSpeed, pVario, gVario, turnRate)
+        """
         p["computeL3"]["gSpeed"] = (p["computeL2"]["distance"] * 3600) / p["computeL2"]["timeDelta"]
         p["computeL3"]["pVario"] = float(p["computeL2"]["pAltDelta"]) / p["computeL2"]["timeDelta"]
         p["computeL3"]["gVario"] = float(p["computeL2"]["gAltDelta"]) / p["computeL2"]["timeDelta"]
@@ -115,6 +181,9 @@ class Flight(FlightBase):
                 - prevP["computeL2"]["bearing"]) / p["computeL2"]["timeDelta"]
 
     def computeStats(self, p):
+        """
+        Updates the internal flight stats considering the new given point.
+        """
         self.stats["totalKms"] += p["computeL2"]["distance"]
         self.stats["maxAlt"] = max(self.stats["maxAlt"], p["pAlt"])
         self.stats["minAlt"] = p["pAlt"] if self.stats["minAlt"] is None \
@@ -124,12 +193,21 @@ class Flight(FlightBase):
             else min(self.stats["minGSpeed"], p["computeL3"]["gSpeed"])
 
     def newPhase(self, pIndex, phaseType):
+        """
+        Adds a new flight phase to the phases list, closing the previous one.
+        """
         if len(self.phases) != 0:
             self.phases[-1]["end"] = pIndex - 1
         self.phases.append({"start": pIndex, "end": None, "type": phaseType})
         # TODO: calculate phase stats?
 
     def updateMode(self):
+        """
+        Computes the current flight mode (straight, circling, stopped).
+
+        This means computing the flight mode of the last point in the current
+        track. If required, it adds a new phase to the global list.
+        """
         # First point, just set as stopped and return
         if len(self.points) == 1:
             self.points[0]["computeL4"]["mode"] = Flight.STOPPED
@@ -166,6 +244,9 @@ class Flight(FlightBase):
             self.newPhase(pI, Flight.STRAIGHT)
 
     def pathInKml(self):
+        """
+        Returns the flight's track in KML format.
+        """
         pathKml = ""
         for point in self.points:
             pathKml += "%.2f,%.2f,%d " % (point["latdg"], point["londg"], point["gAlt"])
@@ -176,9 +257,12 @@ class Flight(FlightBase):
                 self.metadata["plt"], self.metadata["gty"], 
                 self.metadata["gid"])
 
-class FlightReader(FlightBase):
+class FlightParser(FlightBase):
     """
-    Creates a Flight object from the data taken from the given FlightFetcher.
+    Parses a given flight track in IGC format.
+
+    self.flight: the Flight object
+    self.rawFlight: the flight in the given IGC format
     """
 
     def __init__(self, rawFlight, autoParse=True):
@@ -189,7 +273,12 @@ class FlightReader(FlightBase):
 
     def parse(self):
         """
+        Triggers the parse.
+
+        See the link below for details on parsing IGC tracks.
         http://carrier.csi.cam.ac.uk/forsterlewis/soaring/igc_file_format/igc_format_2008.html
+
+        It relies on the parse*() methods to parse each individual record.
         """
         lines = self.flight.rawFlight.split("\n")
         for line in lines:
@@ -236,25 +325,59 @@ class FlightReader(FlightBase):
         None
 
 class FlightOptimizer(FlightBase):
+    """
+    Evaluates the flight distance following different rules and algorithms.
+    
+    For each different rule the corresponding circuit is returned.
+
+    Rules currently include:
+      1 turnpoint (out and return)
+      2 turnpoints
+      3 turnpoints
+
+    It would be good to add in the future:
+      4 turnpoints (online contest style)
+      FAI triangle
+    """
 
     def __init__(self, flight):
+        """
+        Initiates the optimizer objects.
+        """
         self.flight = flight
         self.maxCPDistance = 0 # Maximum distance between 2 consecutive points
         self.prepare()
 
     def prepare(self):
+        """
+        Calculates and stores the maximum distance between any two points.
+
+        This is useful for optimization purposes (see forward()).
+        """
         for i in range(0, len(self.flight.points)-1):
             distance = self.distance(self.flight.points[i], self.flight.points[i+1])
             if distance > self.maxCPDistance:
                 self.maxCPDistance = distance
 
     def forward(self, i, distance):
+        """
+        Evaluates if we can jump points, and returns the next point.
+
+        Knowing the max distance between any 2 points, then we know how many 
+        points forward (at least) we need to achieve that distance.
+        """
         step = int(distance / self.maxCPDistance)
         if step > 0:
             return i + step
         return i+1
 
     def optimize1(self):
+        """
+        Optimizes the track for 1 turnpoint (out and return).
+
+        Returns the circuit:
+          {"sta": ..., "tps": [..], "end": ..., "distance": ...}
+        """
         circuit = {"sta": None, "tps": None, "end": None, "distance": 0.0}
         flight, nPoints = self.flight, len(self.flight.points)
         sta, tp1, end = 0, 1, nPoints-1
@@ -270,6 +393,12 @@ class FlightOptimizer(FlightBase):
         return circuit
 
     def optimize2(self):
+        """
+        Optimizes the track for 2 turnpoints.
+
+        Returns the circuit:
+          {"sta": ..., "tps": [..], "end": ..., "distance": ...}
+        """
         circuit = {"sta": None, "tps": None, "end": None, "distance": 0.0}
         flight, nPoints = self.flight, len(self.flight.points)
         sta, tp1, tp2, end = 0, 1, -1, nPoints-1
@@ -288,6 +417,12 @@ class FlightOptimizer(FlightBase):
         return circuit
 
     def optimize3(self):
+        """
+        Optimizes the track for 3 turnpoints (netcoupe style).
+
+        Returns the circuit:
+          {"sta": ..., "tps": [..], "end": ..., "distance": ...}
+        """
         circuit = {"sta": None, "tps": None, "end": None, "distance": 0.0}
         flight, nPoints = self.flight, len(self.flight.points)
         sta, tp1, tp2, tp3, end = 0, -1, -1, -1, nPoints-1
