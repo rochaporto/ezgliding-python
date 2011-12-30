@@ -1,3 +1,4 @@
+*.pyc
 *.swp
 google_appengine
 python/appdata.py

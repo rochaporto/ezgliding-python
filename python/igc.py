@@ -88,8 +88,8 @@ class Flight(FlightBase):
         self.computeL1(p)
         if prevP is not None:
             self.computeL2(prevP, p)
-            self.computeL3(prevP, p)
-            self.computeStats(p)
+            #self.computeL3(prevP, p)
+            #self.computeStats(p)
         self.points.append(p)
         self.updateMode()
 
@@ -171,20 +171,14 @@ class Flight(FlightBase):
             pathKml += "%.2f,%.2f,%d " % (point["latdg"], point["londg"], point["gAlt"])
         return "<LineString><coordinates>%s</coordinates></LineString>" % pathKml
 
-class FlightFetcher(FlightBase):
-
-    def __init__(self, uri):
-        self.uri = uri
-        self.rawContent = None
-
-    def fetch(self):
-        self.verbose("Fetching flight from : %s" % self.uri)
-        self.raw = urllib2.urlopen(self.uri).read()
-        return self.raw
+    def __str__(self):
+        return "date=%s :: pilot=%s :: type=%s :: reg=%s" % (self.metadata["dte"],
+                self.metadata["plt"], self.metadata["gty"], 
+                self.metadata["gid"])
 
 class FlightReader(FlightBase):
     """
-        Creates a Flight object from the data taken from the given FlightFetcher.
+    Creates a Flight object from the data taken from the given FlightFetcher.
     """
 
     def __init__(self, rawFlight, autoParse=True):
@@ -195,7 +189,7 @@ class FlightReader(FlightBase):
 
     def parse(self):
         """
-            http://carrier.csi.cam.ac.uk/forsterlewis/soaring/igc_file_format/igc_format_2008.html
+        http://carrier.csi.cam.ac.uk/forsterlewis/soaring/igc_file_format/igc_format_2008.html
         """
         lines = self.flight.rawFlight.split("\n")
         for line in lines:
@@ -230,6 +224,12 @@ class FlightReader(FlightBase):
             self.flight.metadata[hType] = record[record.find(':')+1:]
 
     def parseI(self, record):
+        None
+
+    def parseJ(self, record):
+        None
+
+    def parseK(self, record):
         None
 
     def parseL(self, record):

@@ -1,13 +1,14 @@
 import logging
 import urllib
 import urllib2
+import sys
 
-from google.appengine.api.taskqueue import Task
+from google.appengine.api import taskqueue
 from google.appengine.ext.webapp import RequestHandler, WSGIApplication
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 import appdata
-from igc import FlightReader, FlightExporter, FlightFetcher
+from igc import FlightReader, FlightExporter
 
 class CommonHandler(RequestHandler):
 
@@ -28,31 +29,112 @@ class CommonHandler(RequestHandler):
         return authDict["Auth"]
 
 class NetcoupeHandler(CommonHandler):
+    """
+    The RequestHandler used as a cron job to fetch flights from
+    the netcoupe.net competition.
+    """
+
+    def lastProcessedId(self):
+        """
+        Returns the last flight ID already fetched and processed.
+        """
+        return 36225
+
+    def getTask(self, flightId, url):
+        """
+        Returns a Task object with all the given data in the expected places,
+        ready to be added to its queue.
+        """
+        task = taskqueue.Task(
+                url="/crawler/netcoupe/worker", 
+                params={"id": flightId, "url": url})
+        return task
+
+    def queueFlights(self, startId=1, lastId=-1):
+        """
+        Queues the flights corresponding to the given IDs for later
+        processing, validating that the flights actually exist in the
+        netcoupe competition.
+        """
+        curId = startId
+        while True:
+            flightUrl = NetcoupeWorker._baseIgcUrl % curId
+            result = urllib.urlopen(flightUrl)
+            flightData = result.read()
+            result.close()
+            if len(flightData) == 0 or (lastId != -1 and curId > lastId):
+                logging.info("stopping flight queueing at ID %d" % curId)
+                break
+            self.getTask(curId, flightUrl).add("crawler-netcoupe")
+
+            logging.info("queued for processing ID %d" % curId)
+            curId = curId + 1
 
     def get(self):
-        logging.info("NetcoupeHandler: started")
-#        url = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=7347"
-#        task = Task(url="/crawler/netcoupe/worker", params={"url": url})
-#        task.add("flightprocess")
+        """
+        This is the method called by the appengine Handler.
+        """
+        self.queueFlights(self.lastProcessedId())
 
 class NetcoupeWorker(CommonHandler):
+    """
+    The RequestHandler picking up tasks from the netcoupe.net competition
+    queue, processing them, and pushing the result into the fusion table.
+    """
+
+    _baseDetailUrl = "http://netcoupe.net/Results/FlightDetail.aspx?FlightID=%s"
+    _baseIgcUrl = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=%s"
 
     def __init__(self):
         self.authToken = None
 
+    def netcoupeData(self, flightId):
+        """
+        Returns all the netcoupe defined data (info separated from the stuff
+        in the igc file, which the netcoupe does not necessarily use).
+        """
+        None
+
+    def getFlight(self, flightId):
+        """
+        Returns a Flight object containing all the processed IGC data.
+        """
+        flightUrl = self._baseIgcUrl % flightId
+        result = urllib.urlopen(flightUrl)
+        if result.getcode() != 200:
+            logging.error("Unexpected code %d processing flight %s" 
+                    % (result.getcode(), flightUrl))
+        flightData = result.read()
+        result.close()
+        try:
+            reader = FlightReader(flightData)
+        except:
+            logging.error("failed processing flight :: %s" % (flightUrl))
+            raise
+        return reader.flight
+
+    def processFlight(self, flightId):
+        """
+        Processes a single flight (the one from the given id).
+        This includes both the IGC file data, and the netcoupe specific data
+        taken from the webpage.
+        """
+        flight = self.getFlight(flightId)
+        netcoupeData = self.netcoupeData(flightId)
+        logging.info(flight)
+
     def post(self):
-        url = self.request.get('url')
-        logging.info("NetcoupeWorker: processing flight :: url=%s" % url)
-        if self.authToken is None:
-            self.authToken = self.gAuth("rocha.porto", appdata.password, "fusiontables", "HOSTED_OR_GOOGLE")
-        reader = FlightReader( FlightFetcher(url).fetch() )
-        exporter = FlightExporter(reader.flight)
-        req = urllib2.Request(self.fusionTablesUri,
-                urllib.urlencode({"sql": exporter.toFusionTable(872803)}),
-                {"Authorization": "GoogleLogin auth=%s" % self.authToken,
-                "Content-Type": "application/x-www-form-urlencoded"})
-        resp = urllib2.urlopen(req)
-        print resp
+        """
+        The RequestHandler method called by the task processing.
+        """
+        flightId = self.request.get("id")
+        self.processFlight(flightId)
+        #exporter = FlightExporter(reader.flight)
+        #req = urllib2.Request(self.fusionTablesUri,
+        #        urllib.urlencode({"sql": exporter.toFusionTable(872803)}),
+        #        {"Authorization": "GoogleLogin auth=%s" % self.authToken,
+        #        "Content-Type": "application/x-www-form-urlencoded"})
+        #resp = urllib2.urlopen(req)
 
 def main():
     app = WSGIApplication([
@@ -60,7 +142,6 @@ def main():
             ('/crawler/netcoupe/worker', NetcoupeWorker),
             ], debug=True)
     logging.getLogger().setLevel(logging.DEBUG)
-    logging.debug("AAA")
     run_wsgi_app(app)
 
 if __name__ == '__main__':
