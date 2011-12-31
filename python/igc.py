@@ -441,34 +441,6 @@ class FlightOptimizer(FlightBase):
                     else:
                         tp3 = self.forward(tp3, 0.5 *(circuit["distance"] - distance))
         return circuit
-    
-class FlightExporter(FlightBase):
-
-    def __init__(self, flight):
-        self.flight = flight
-
-    def toText(self):
-        text = """
-        Date: %s\tPilot: %s
-        Registration: %s\tType: %s\t\tClass: %s
-        Points: %d
-        """ % (self.flight.metadata["dte"].strftime("%Y-%m-%d"), 
-        self.flight.metadata["plt"], self.flight.metadata["gid"],
-        self.flight.metadata["gty"], self.flight.metadata["ccl"], 
-        len(self.flight.points))
-        kml = self.flight.pathInKml()
-        print "%s :: %d" % (kml, len(kml))
-        return text
-
-    def toFusionTable(self, tableId):
-        sql = """
-            INSERT INTO %s (Date, Pilot, Registration, Type, Class, Points)
-            VALUES ('%s', '%s', '%s', '%s', '%s', '%s')
-        """ % (tableId, self.flight.metadata["dte"].strftime("%Y-%m-%d"), 
-            self.flight.metadata["plt"], self.flight.metadata["gid"],
-            self.flight.metadata["gty"], self.flight.metadata["ccl"],
-            self.flight.pathInKml())
-        return sql
 
 class FlightCmdLine(object):
 
@@ -493,12 +465,7 @@ class FlightCmdLine(object):
         verbose = self.options.verbose 
 
     def run(self):
-        flightFetcher = FlightFetcher(self.args[0])
-        flightReader = FlightReader(flightFetcher)
-        print FlightExporter(flightReader.flight).export()
-        flightOpt = FlightOptimizer(flightReader.flight)
-        circuit = flightOpt.optimize3()
+        None
 
 if __name__ == "__main__":
-    flightCmd = FlightCmdLine()
-    sys.exit(flightCmd.run())
+    None

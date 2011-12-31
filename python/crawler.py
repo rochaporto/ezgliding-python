@@ -7,7 +7,7 @@ from google.appengine.ext.webapp import RequestHandler, WSGIApplication
 from google.appengine.ext.webapp.util import run_wsgi_app
 
 import appdata
-from igc import FlightParser, FlightExporter
+import igc
 
 class CommonHandler(RequestHandler):
 
@@ -104,7 +104,7 @@ class NetcoupeWorker(CommonHandler):
                     % (result.status_code, flightUrl))
         flightData = result.content
         try:
-            reader = FlightParser(flightData)
+            reader = igc.FlightParser(flightData)
         except:
             logging.error("failed processing flight :: %s" % (flightUrl))
             raise
