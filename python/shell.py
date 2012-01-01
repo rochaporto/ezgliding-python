@@ -16,6 +16,9 @@ import flight
 import optimizer
 
 def getTraceback():
+    """
+    Returns a simplified stack trace for logging.
+    """
     cla, exc, trbk = sys.exc_info()
     return "Class: '%s' :: Exception: '%s' :: Traceback: '%s'" \
         % (cla.__name__, exc, traceback.format_tb(trbk, 5))
