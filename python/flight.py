@@ -75,6 +75,10 @@ class Flight(FlightBase):
       prs (pressure sensor description), cid (competition id), 
       ccl (glider class)
 
+    self.extra: extra flight metadata, taken from a source other than the track
+      name, club, date, airfield, country, distance, glider, fileid, 
+      avgSpeed, comment
+
     self.control: control evaluation of circling, straight, start, etc
       minSpeed: used for flight start / end
       minCircleRate: 
@@ -101,7 +105,7 @@ class Flight(FlightBase):
 
     STOPPED, STRAIGHT, CIRCLING = range(3)
 
-    def __init__(self):
+    def __init__(self, extra=None):
         """
         Initiates the internal structures.
         """
@@ -111,6 +115,13 @@ class Flight(FlightBase):
             "gid": None, "dtm": None, "rfw": None, "rhw": None, "fty": None,
             "gps": None, "prs": None, "cid": None, "ccl": None
         }
+        self.extra = extra
+        if extra is None:
+            self.extra = {
+                "name": None, "club": None, "date": None, "airfield": None,
+                "country": None, "distance": -1, "glider": None, "fileid": -1,
+                "avgSpeed": -1, "comment": None,
+            }
         self.control = {
             "minSpeed": 50.0, "minCircleRate": 4, "minCircleTime": 45, "minStraightTime": 15,
         }
@@ -268,8 +279,8 @@ class FlightParser(FlightBase):
     self.rawFlight: the flight in the given IGC format
     """
 
-    def __init__(self, rawFlight, autoParse=True):
-        self.flight = Flight()
+    def __init__(self, rawFlight, extra=None, autoParse=True):
+        self.flight = Flight(extra=extra)
         self.flight.rawFlight = rawFlight
         if autoParse:
             self.parse()

@@ -7,7 +7,10 @@ These crawlers can both download the flights and save them.
 """
 import logging
 import urllib2
+import re
 import sys
+
+from BeautifulSoup import BeautifulSoup
 
 import appdata
 import flight
@@ -41,13 +44,13 @@ class NetcoupeCrawler(BaseCrawler):
     """
 
     _baseDetailUrl = "http://netcoupe.net/Results/FlightDetail.aspx?FlightID=%s"
-    _baseIgcUrl = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=%s"
+    _baseFlightUrl = "http://netcoupe.net/Download/DownloadIGC.aspx?FileID=%s"
 
     def lastProcessedId(self):
         """
         Returns the last flight ID already fetched and processed.
         """
-        return 36261
+        return 30604
 
     def crawl(self, startId=1, lastId=-1):
         """
@@ -60,50 +63,69 @@ class NetcoupeCrawler(BaseCrawler):
         flights = []
         curId = startId
         while True:
-            flightUrl = NetcoupeCrawler._baseIgcUrl % curId
-            logging.debug("Fetching flight :: %s" % flightUrl)
-            flight = urllib2.urlopen(flightUrl)
-            flightData = flight.read()
-            flight.close()
-            if len(flightData) == 0 or (lastId != -1 and curId > lastId):
-                logging.info("stopping flight queueing at ID %d" % curId)
+            flightUrl = NetcoupeCrawler._baseDetailUrl % curId
+            # Check the detail page... if non existent then we're done
+            logging.debug("Processing flight %d :: %s" % (curId, flightUrl))
+            extra = self.getFlight(curId)
+            if extra is None:
+                logging.info("Stopping at flight %d :: %s" 
+                        % (curId, flightUrl))
                 break
-            flights.append((curId, flightUrl))
+            flights.append((curId, flightUrl, extra))
+            # And we try the next id
             curId = curId + 1
 
         return flights
 
-    def getFlightData(self, flightId):
+    def getFlight(self, flightId):
         """
         Returns all the netcoupe defined data (info separated from the stuff
         in the igc file, which the netcoupe does not necessarily use).
         """
-        None
+        extra = None
+        flightUrl = self._baseDetailUrl % flightId
+        logging.debug("Fetching flight %d :: %s" % (flightId, flightUrl))
 
-    def getFlight(self, flightId):
-        """
-        Returns a Flight object containing all the processed IGC data.
-        """
-        flightUrl = self._baseIgcUrl % flightId
+        dPage = urllib2.urlopen(flightUrl)
+        extraData = dPage.read()
+        dPage.close()
+
+        if extraData.find("indisponible") != -1:
+            logging.debug("Extra data for %d was empty" % flightId)
+            return None
+
+        # First parse the 'extra' flight metadata (netcoupe specific)
+        soup = BeautifulSoup(extraData)
+        items = soup.findAll("td")
+        extra = {
+            "name": items[4].div.a.string.strip(),
+            "club": items[8].div.a.string.strip(),
+            "date": items[12].div.string.strip(),
+            "airfield": items[14].div.string.strip(),
+            "country": items[18].div.string.strip(),
+            "distance": float(
+                items[20].div.string.replace('&nbsp;kms','').strip(' \r\n').replace(",",".")),
+            "glider": items[25].string.replace('&nbsp;','').strip(),
+            "fileid": int(re.match(r".*FileID=(\d+)", items[30].div.a["href"].strip()).groups()[0]),
+            "avgSpeed": float(items[32].div.string.replace('&nbsp;km/h','').strip().replace(",",".")),
+            "comment": items[44].div.string.strip(' \r\n'),
+        }
+
+        # Then parse the actual flight track
+        flightUrl = self._baseFlightUrl % extra["fileid"]
         flightD = urllib2.urlopen(flightUrl)
         flightData = flightD.read()
         flightD.close()
         if flightD.getcode() != 200:
             logging.error("Unexpected code %d processing flight %s" 
                     % (flightD.getcode(), flightUrl))
-        try:
-            reader = flight.FlightParser(flightData)
-        except:
-            logging.error("Failed processing flight :: %s" % sys.exc_info()[1])
-            raise
-        return reader.flight
+        parser = flight.FlightParser(flightData, extra=extra)
+        return parser.flight
 
-    def processFlight(self, flightId):
+    def processFlight(self, flightId, extra):
         """
         Processes a single flight (the one from the given id).
 
         This includes parsing the track and fetching the netcoupe data.
         """
-        flight = self.getFlight(flightId)
-        netcoupeData = self.getFlightData(flightId)
-        logging.info(flight)
+        None

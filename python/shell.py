@@ -9,10 +9,16 @@ import readline
 import urllib2
 import subprocess
 import sys
+import traceback
 
 import crawler
 import flight
 import optimizer
+
+def getTraceback():
+    cla, exc, trbk = sys.exc_info()
+    return "Class: '%s' :: Exception: '%s' :: Traceback: '%s'" \
+        % (cla.__name__, exc, traceback.format_tb(trbk, 5))
 
 class Command(cmd.Cmd):
     """
@@ -44,27 +50,53 @@ testing purposes. Type 'help' or 'help command' for more information.
             crawl = crawler.NetcoupeCrawler()
             flights = crawl.crawl(crawl.lastProcessedId())
             for flight in flights:
-                crawl.processFlight(flight[0])
+                crawl.processFlight(flight[0], flight[2])
         except:
-            print "Failed to crawl flights :: ", sys.exc_info()[1]
+            logging.error("Failed to crawl flights :: %s" % getTraceback())
 
-    def do_load(self, location):
+    def do_load(self, paramStr):
         """
         Loads the given flight into memory, so that you can issue other 
         commands like optimize, etc.
 
-        example: load http://ezgliding.com/path/to/flight 
-        (for local files use file:///path/to/file)
+        Parameters are flightId and crawlType (optional, default is netcoupe).
+
+        example: load 30604 netcoupe
+        """
+        params = paramStr.split(" ")
+        if len(params) == 1:
+            params.append("netcoupe")
+
+        try:
+            crawl = None
+            if params[1] == "netcoupe":
+                crawl = crawler.NetcoupeCrawler()
+            else:
+                logging.error("Unknown crawlType given :: %s" % params[1])
+                return
+            self.flight = crawl.getFlight(int(params[0]))
+            if self.flight is None:
+                logging.error("Failed to load: crawltype %s has no flight %s" 
+                        % (params[1], params[0]))
+        except:
+            logging.error("Failed to load :: %s" % getTraceback())
+
+    def do_lload(self, location):
+        """
+        Loads the flight track at the given location.
+
+        The location is an URI, file:/// can be used for local files.
         """
         try:
-            uri = urllib2.urlopen(location)
-            data = uri.read()
-            uri.close()
-            self.flight = flight.FlightParser(data).flight
+            track = urllib2.urlopen(location)
+            data = track.read()
+            track.close()
+            parser = flight.FlightParser(data)
+            self.flight = parser.flight
         except:
-            print "Failed to load :: ", sys.exc_info()[1]
+            logging.error("Failed to load track :: %s" % getTraceback())
 
-    def do_optimize(self, optType=2):
+    def do_optimize(self, optType):
         """
         Optimizes the currently loaded flight, printing the result. It accepts
         the optimization type to be used - current types are:
@@ -72,10 +104,13 @@ testing purposes. Type 'help' or 'help command' for more information.
         2 - two turnpoints (triangle)
         3 - three turnpoints (netcoupe style)
 
+        If no type is specified, then all optimizations are performed.
+
         example: optimize 3
 
         TODO: FAI triangle, 4 turnpoints (olc style)
         """
+        optType = int(optType) if optType != "" else 2
 
         if self.flight is not None:
             try:
@@ -83,14 +118,14 @@ testing purposes. Type 'help' or 'help command' for more information.
                 optMethod = getattr(ezopt, "optimize%s" % optType)
                 optMethod()
             except:
-                print "Failed to optimize :: ", sys.exc_info()[1]
+                logging.error("Failed to optimize :: %s" % getTraceback())
 
     def do_print(self, command):
         """
         Prints details of the currently loaded flight (if any).
         """
         if self.flight is not None:
-            print self.flight
+            logging.info(self.flight)
 
     def do_exit(self, value):
         """
@@ -111,8 +146,8 @@ testing purposes. Type 'help' or 'help command' for more information.
         try:
             subprocess.check_call(command.split(' '))
         except:
-            print "Failed to execute command '%s' :: " % command, \
-                sys.exc_info()[1]
+            logging.error("Failed to execute command '%s' :: %s" % (command,
+                getTraceback()))
 
     def do_help(self, command):
         """
