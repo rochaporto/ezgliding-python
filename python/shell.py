@@ -1,15 +1,30 @@
+"""
+A shell useful while testing ezgliding functionality.
+
+It provides an Cmd based shell to easily trigger each function.
+"""
 import cmd
+import logging
 import readline
 import urllib2
+import subprocess
 import sys
 
+import crawler
 import flight
 import optimizer
 
 class Command(cmd.Cmd):
+    """
+    A Cmd implementation exposing all ezgliding functionality.
 
+    Useful for testing purposes.
+    """
     def __init__(self):
         cmd.Cmd.__init__(self)
+
+        logging.basicConfig(level=logging.DEBUG)
+
         self.flight = None
         self.prompt = "ezgliding> "
         self.intro = """
@@ -18,6 +33,20 @@ The ezgliding.com software shell.
 It provides commands exposing all functionality, especially useful for 
 testing purposes. Type 'help' or 'help command' for more information.
 """
+
+    def do_crawl(self, crawlType):
+        """
+        Invokes the given crawler and lists the corresponding flights.
+
+        Existing crawlers include: netcoupe
+        """
+        try:
+            crawl = crawler.NetcoupeCrawler()
+            flights = crawl.crawl(crawl.lastProcessedId())
+            for flight in flights:
+                crawl.processFlight(flight[0])
+        except:
+            print "Failed to crawl flights :: ", sys.exc_info()[1]
 
     def do_load(self, location):
         """
@@ -67,7 +96,7 @@ testing purposes. Type 'help' or 'help command' for more information.
         """
         Quits the shell.
         """
-        self.do_quit(value)
+        return self.do_quit(value)
 
     def do_quit(self, value):
         """
@@ -75,11 +104,15 @@ testing purposes. Type 'help' or 'help command' for more information.
         """
         return True
 
-    def do_shell(self):
+    def do_shell(self, command):
         """
         Executes the given shell command.
         """
-        None
+        try:
+            subprocess.check_call(command.split(' '))
+        except:
+            print "Failed to execute command '%s' :: " % command, \
+                sys.exc_info()[1]
 
     def do_help(self, command):
         """
