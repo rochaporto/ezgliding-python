@@ -1,3 +1,8 @@
+"""
+Abstraction of a gliding flight track.
+
+This modules provides classes to parse GPS tracks for gliding flights.
+"""
 import optparse
 import sys
 

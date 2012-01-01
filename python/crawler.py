@@ -1,3 +1,10 @@
+"""
+Crawlers for flights available in online gliding competitions.
+
+This modules provides flight crawlers for popular online gliding competitions.
+
+These crawlers can both download the flights and save them.
+"""
 import logging
 import urllib2
 import sys
@@ -10,7 +17,11 @@ import appdata
 import flight
 
 class CommonHandler(RequestHandler):
+    """
+    Base class with common functionality to all handlers.
 
+    Inheritance could be avoided if we made it a util class.
+    """
     gAuthUri = "https://www.google.com/accounts/ClientLogin"
 
     fusionTablesUri = "http://www.google.com/fusiontables/api/query"
@@ -134,6 +145,11 @@ class NetcoupeWorker(CommonHandler):
         #resp = urllib2.urlopen(req)
 
 def main():
+    """
+    The main method required by appengine.
+
+    Associates url paths with each Handler.
+    """
     app = WSGIApplication([
             ('/crawler/netcoupe', NetcoupeHandler),
             ('/crawler/netcoupe/worker', NetcoupeWorker),

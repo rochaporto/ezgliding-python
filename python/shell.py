@@ -35,20 +35,24 @@ testing purposes. Type 'help' or 'help command' for more information.
         except:
             print "Failed to load :: ", sys.exc_info()[1]
 
-    def do_optimize(self, type):
+    def do_optimize(self, optType=2):
         """
         Optimizes the currently loaded flight, printing the result. It accepts
         the optimization type to be used - current types are:
         1 - out and return
-        2 - two turnpoints
+        2 - two turnpoints (triangle)
         3 - three turnpoints (netcoupe style)
 
         example: optimize 3
+
+        TODO: FAI triangle, 4 turnpoints (olc style)
         """
+
         if self.flight is not None:
             try:
                 ezopt = optimizer.Optimizer(self.flight)
-                ezopt.optimize1()
+                optMethod = getattr(ezopt, "optimize%s" % optType)
+                optMethod()
             except:
                 print "Failed to optimize :: ", sys.exc_info()[1]
 

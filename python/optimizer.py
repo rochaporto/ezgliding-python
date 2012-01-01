@@ -1,3 +1,10 @@
+"""
+Algorithms to calculate gliding flight optimizations.
+
+This modules provides several algorithms to optimize gliding flights.
+
+Optimization means calculating the longest circuit in the gps track.
+"""
 import flight
 
 from math import sin, cos, asin, acos, atan2, fabs, sqrt, radians, degrees, pi
