@@ -15,6 +15,21 @@ class FlightCrawler(RequestHandler):
 
     Flights are first fetched and then pushed to the competition queue.
     """
+    def get(self):
+        """
+        This is the method called by the appengine Handler.
+        """
+        flights = None
+
+        crawlType = self.request.get("type")
+        logging.info("Crawling flights for %s" % crawlType)
+        if crawlType == "netcoupe":
+            crawl = crawler.NetcoupeCrawler()
+            flights = crawl.crawl(crawl.lastProcessedId())
+        else:
+            self.error(500)
+        self.queue(flights, crawlType=crawlType)
+
 
     def getTask(self, flightId, crawlType, url):
         """
@@ -35,25 +50,12 @@ class FlightCrawler(RequestHandler):
             task.add("crawler-%s" % crawlType)
             logging.info("Queued flight %d for processing" % flight[0])
 
-    def get(self):
-        """
-        This is the method called by the appengine Handler.
-        """
-        flights = None
-
-        crawlType = self.request.get("type")
-        logging.info("Crawling flights for %s" % crawlType)
-        if crawlType == "netcoupe":
-            crawl = crawler.NetcoupeCrawler()
-            flights = crawl.crawl(crawl.lastProcessedId())
-        else:
-            self.error(500)
-        self.queue(flights, crawlType=crawlType)
-
 class FlightWorker(RequestHandler):
     """
-    """
+    Handler to process flights (parse, analyse) and store them.
 
+    Normally used as a task queue processor.
+    """
     def post(self):
         """
         The RequestHandler method called by the task processing.
