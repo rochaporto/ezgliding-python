@@ -1,4 +1,4 @@
 cron:
-- description: netcoupe flight crawler
-  url: /crawler/netcoupe
+- description: flight crawler for the netcoupe competition
+  url: /crawler?type=netcoupe
   schedule: every 1 minutes
