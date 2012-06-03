@@ -128,3 +128,30 @@ class Optimizer(flight.FlightBase):
                         tp3 = self.forward(tp3, 0.5 *(circuit["distance"] - distance))
         return circuit
 
+    def optimize4(self):
+        """
+        Optimizes the track using montecarlo methods.
+
+        Returns the circuit:
+          {"sta": ..., "tps": [..], "end": ..., "distance": ...}
+        """
+        circuit = {"sta": None, "tps": None, "end": None, "distance": 0.0}
+        flight, nPoints = self.flight, len(self.flight.points)
+
+
+
+    def montecarlo(self, low, high, devisor, nPoints):
+        turnPts = []
+        # Choose a set of random turnpoints in the given range
+        for i in range(0, wps):
+            index = (random.randint((high - low + 1) / devisor) * devisor) + low
+            turnPts.append(index)
+
+        # Put them in order
+        turnPts.sort()
+
+    def totalKms(self, start, end, turnPts):
+        kms = self.distance(
+        for i in range(0, turnPts):
+            kms += 
+
